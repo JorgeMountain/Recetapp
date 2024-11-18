@@ -1,4 +1,5 @@
 class User {
+  var _uid;
   var _name;
   var _email;
   var _password;
@@ -22,6 +23,7 @@ class User {
   User.Empty();
 
   User(
+      this._uid,
       this._name,
       this._email,
       this._password,
@@ -40,6 +42,7 @@ class User {
 
   // Método para convertir la instancia de User a un Map (para JSON)
   Map<String, dynamic> toJson() => {
+    "uid": _uid,
     "name": _name,
     "email": _email,
     "password": _password,
@@ -58,6 +61,7 @@ class User {
 
   // Constructor para crear una instancia de User a partir de un Map (JSON)
   User.fromJson(Map<String, dynamic> json) {
+    _uid = json['uid'];
     _name = json["name"];
     _email = json["email"];
     _password = json["password"];
@@ -158,6 +162,10 @@ class User {
   set kidsRecipes(value) {
     _kidsRecipes = value;
   }
+
+  get uid => _uid;
+
+  set uid( value){ _uid = value; }
 
 // Getters y setters
 

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:recetapp/pages/navigation_bar_page.dart';
+import '../models/user.dart';
+import '../repository/firebase_api.dart';
 import 'login_page.dart';
 
 class FoodPreferencesPage extends StatefulWidget {
+  final String uid;
   final String name;
   final String email;
   final String password;
@@ -11,6 +14,7 @@ class FoodPreferencesPage extends StatefulWidget {
 
   const FoodPreferencesPage({
     Key? key,
+    required this.uid,
     required this.name,
     required this.email,
     required this.password,
@@ -51,25 +55,49 @@ class _FoodPreferencesPageState extends State<FoodPreferencesPage> {
     });
   }
 
+  void _onCreateAccount() async {
+    final newUser = User(
+      widget.uid, // UID generado en RegisterPage
+      widget.name,
+      widget.email,
+      widget.password,
+      widget.birthDate,
+      widget.genre,
+      _ketoDiet,
+      _vegetarian,
+      _vegan,
+      _glutenFree,
+      _carnivoreDiet,
+      _mediterraneanDiet,
+      _noRestrictions,
+      _petsRecipes,
+      _kidsRecipes,
+    );
+
+    // Guardar usuario en Firestore
+    final result = await FirebaseApi().createUserInDB(newUser);
+
+    if (result == widget.uid) {
+      // Navegar a la siguiente página (NavigationBarPage, por ejemplo)
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const NavigationBarPage(),
+        ),
+      );
+    } else {
+      // Mostrar un mensaje de error si ocurre un problema
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar el usuario: $result')),
+      );
+    }
+  }
+
   // Método para deshabilitar las demás opciones si "Sin restricciones" está activado
   bool _isOptionDisabled() {
     return _noRestrictions;
   }
 
-  // Lógica para el botón de "Crear cuenta"
-  void _onCreateAccount() {
-    // Imprimir los detalles de creación del usuario y preferencias
-    print("Usuario creado: ${widget.name}");
-    print(
-        "Preferencias: Keto: $_ketoDiet, Vegetariano: $_vegetarian, Vegano: $_vegan, Sin gluten: $_glutenFree, Carnívora: $_carnivoreDiet, Mediterránea: $_mediterraneanDiet, Sin restricciones: $_noRestrictions");
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const NavigationBarPage(), // Después de crear la cuenta, redirigir al LoginPage
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {

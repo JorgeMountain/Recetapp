@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../models/user.dart';
 import 'food_preferences_page.dart'; // Nueva página de preferencias alimentarias
 import '../repository/firebase_api.dart'; // Importa FirebaseApi para el registro
 
@@ -70,11 +71,23 @@ class _RegisterPageState extends State<RegisterPage> {
     return formatter.format(newDate);
   }
 
+
+  void _createUserInDB(User user) async {
+    var result = await _firebaseApi.createUserInDB(user);
+
+    if (result == 'network-request-failed') {
+      _showMessage('Revise su conexión a internet');
+    } else {
+      _showMessage('Usuario creado con éxito');
+      Navigator.pop(context);
+    }
+  }
+
+
   // Lógica para registrar el usuario con FirebaseApi
   void _createUser() async {
     String? result = await _firebaseApi.createUser(_email.text, _password.text);
 
-    // Verifica si el resultado es un código de error o un UID
     if (result == 'email-already-in-use') {
       _showMessage("Este correo ya está en uso.");
     } else if (result == 'weak-password') {
@@ -82,7 +95,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } else if (result == 'invalid-email') {
       _showMessage("El correo es inválido.");
     } else if (result != null) {
-      // Usuario creado exitosamente (Firebase retorna el UID)
+      // Navegar a la página de preferencias con los datos
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -92,14 +105,15 @@ class _RegisterPageState extends State<RegisterPage> {
             password: _password.text,
             birthDate: _birthDate.toString(),
             genre: _selectedGenre == Genre.male ? "Masculino" : "Femenino",
+            uid: result, // Pasamos el UID generado
           ),
         ),
       );
     } else {
-      // Si hay otro error
       _showMessage("Error desconocido al crear el usuario.");
     }
   }
+
   String _getErrorMessage(String errorCode) {
     switch (errorCode) {
       case 'email-already-in-use':
