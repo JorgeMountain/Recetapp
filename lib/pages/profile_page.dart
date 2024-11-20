@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../repository/firebase_api.dart';
+import 'settings_page.dart'; // Importa la página de configuración
 import 'package:recetapp/pages/recipe_card.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -25,14 +26,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
   late TabController _tabController;
 
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this); // Cambia a 2 pestañas
     _loadUserData();
   }
-
 
   @override
   void dispose() {
@@ -59,7 +58,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     }
   }
 
-
   File? imageGobal;
 
   Future pickImage() async {
@@ -70,30 +68,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
       final imageTemp = File(image.path);
 
-      setState(() => this.imageGobal = imageTemp);
+      setState(() => imageGobal = imageTemp);
       _firebaseApi.updateProfilePicture(imageGobal);
     } on PlatformException catch (e) {
       print('Failed to pick image: $e');
     }
-
   }
-
-  Future pickImageC() async {
-    try {
-      final image = await ImagePicker().pickImage(source: ImageSource.camera);
-
-      if (image == null) return;
-
-      final imageTemp = File(image.path);
-
-      setState(() => this.imageGobal = imageTemp);
-    } on PlatformException catch (e) {
-      print('Failed to pick image: $e');
-    }
-  }
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +81,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          // Imagen de fondo y configuración
+          // Imagen de fondo
           Stack(
             children: [
               GestureDetector(
@@ -128,7 +108,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 right: 10,
                 child: IconButton(
                   onPressed: () {
-                    print("Configuración presionada");
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SettingsPage()),
+                    );
                   },
                   icon: const Icon(Icons.settings, color: Colors.white),
                 ),
@@ -136,6 +119,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             ],
           ),
           const SizedBox(height: 10),
+
           // Imagen de perfil
           GestureDetector(
             onTap: pickImage,
@@ -149,13 +133,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           ),
           const SizedBox(height: 10),
 
-          // Nombre del usuario
+          // Nombre del usuario (sin botón de configuración)
           Text(
             _userName,
             style: const TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
-
           const SizedBox(height: 10),
 
           // Estadísticas de seguidores, vistas, recetas
@@ -167,10 +153,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               _buildStat("Recetas", _recipes),
             ],
           ),
-
           const SizedBox(height: 10),
 
-          // Pestañas de Recetas, Favoritos, Guardados
+          // Pestañas de Recetas, Favoritos
           TabBar(
             controller: _tabController,
             indicatorColor: Colors.white,
@@ -188,15 +173,17 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               controller: _tabController,
               children: [
                 _buildTabContent("Aún no hay recetas."),
-                _buildFavoritesTab(), // Ahora muestra los favoritos correctamente
+                _buildFavoritesTab(),
               ],
             ),
           ),
-
         ],
       ),
     );
   }
+
+
+
   Widget _buildFavoritesTab() {
     final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -231,14 +218,13 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               title: recipe['title'] ?? 'Sin título',
               imageUrl: recipe['image'] ?? 'https://via.placeholder.com/300',
               recipe: recipe,
-              isFavoriteTab: true, // Indica que estás en la pestaña de favoritos
+              isFavoriteTab: true,
             );
           },
         );
       },
     );
   }
-
 
   Widget _buildStat(String label, int value) {
     return Column(
