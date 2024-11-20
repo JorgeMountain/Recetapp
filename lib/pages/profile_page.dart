@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../repository/firebase_api.dart';
+import 'package:recetapp/pages/recipe_card.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -28,9 +29,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this); // Cambia a 2 pestañas
     _loadUserData();
   }
+
 
   @override
   void dispose() {
@@ -186,14 +188,57 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               controller: _tabController,
               children: [
                 _buildTabContent("Aún no hay recetas."),
-                _buildTabContent("Aún no hay favoritos."),
+                _buildFavoritesTab(), // Ahora muestra los favoritos correctamente
               ],
             ),
           ),
+
         ],
       ),
     );
   }
+  Widget _buildFavoritesTab() {
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('favorites')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text(
+              'Aún no hay favoritos.',
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+          );
+        }
+
+        final favorites = snapshot.data!.docs;
+
+        return ListView.builder(
+          itemCount: favorites.length,
+          itemBuilder: (context, index) {
+            final recipe = favorites[index].data() as Map<String, dynamic>;
+            return buildRecipeCard(
+              context: context,
+              title: recipe['title'] ?? 'Sin título',
+              imageUrl: recipe['image'] ?? 'https://via.placeholder.com/300',
+              recipe: recipe,
+              isFavoriteTab: true, // Indica que estás en la pestaña de favoritos
+            );
+          },
+        );
+      },
+    );
+  }
+
 
   Widget _buildStat(String label, int value) {
     return Column(

@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:recetapp/pages/recipe_detail_screen.dart';
 import 'dart:async';
+import 'package:recetapp/pages/recipe_card.dart';
 
 import 'package:recetapp/repository/spoonacular_api.dart';
 
@@ -130,7 +133,9 @@ class _FoodHomePageState extends State<FoodHomePage> {
   }
 
   // Widget para las tarjetas de recetas más grandes
-  Widget _buildRecipeCard(String title, String imageUrl, Map<String, dynamic> recipe) {
+  Widget _buildRecipeCard(String title, String imageUrl, Map<String, dynamic> recipe, {bool isFavoriteTab = false}) {
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Card(
@@ -142,21 +147,8 @@ class _FoodHomePageState extends State<FoodHomePage> {
         child: InkWell(
           onTap: () async {
             try {
-              // Verifica si el ID de la receta está presente
-              if (recipe['id'] == null) {
-                throw Exception('El ID de la receta no está disponible.');
-              }
-
-              // Llama al método fetchRecipeDetails con el ID de la receta
+              // Navegar a la pantalla de detalles
               final recipeDetails = await apiService.fetchRecipeDetails(recipe['id']);
-
-              // Verifica si los detalles contienen los campos esperados
-              if (recipeDetails['extendedIngredients'] == null ||
-                  recipeDetails['analyzedInstructions'] == null) {
-                throw Exception('Información incompleta de la receta.');
-              }
-
-              // Navega a la pantalla de detalles con la información completa
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -164,9 +156,9 @@ class _FoodHomePageState extends State<FoodHomePage> {
                 ),
               );
             } catch (e) {
-              print('Error al obtener detalles de la receta: $e');
+              print('Error al cargar detalles de la receta: $e');
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('No se pudo cargar la receta: ${e.toString()}')),
+                const SnackBar(content: Text('Error al cargar la receta.')),
               );
             }
           },
@@ -193,20 +185,70 @@ class _FoodHomePageState extends State<FoodHomePage> {
               ),
               Padding(
                 padding: const EdgeInsets.all(10.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Título de la receta
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFE6E6FA), // Color lavanda
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFE6E6FA), // Color lavanda
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    // Botón de favoritos
+                    StatefulBuilder(
+                      builder: (context, setState) {
+                        bool isLoading = false;
+                        return IconButton(
+                          icon: isLoading
+                              ? const CircularProgressIndicator()
+                              : Icon(
+                            isFavoriteTab ? Icons.favorite : Icons.favorite_border,
+                            color: Colors.redAccent,
+                          ),
+                          onPressed: () async {
+                            setState(() => isLoading = true);
+                            try {
+                              if (isFavoriteTab) {
+                                // Eliminar de favoritos
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(userId)
+                                    .collection('favorites')
+                                    .doc(recipe['id'].toString())
+                                    .delete();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Receta eliminada de favoritos.')),
+                                );
+                              } else {
+                                // Agregar a favoritos
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(userId)
+                                    .collection('favorites')
+                                    .doc(recipe['id'].toString())
+                                    .set(recipe);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Receta añadida a favoritos.')),
+                                );
+                              }
+                            } catch (e) {
+                              print('Error al interactuar con Firebase: $e');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('No se pudo procesar la solicitud.')),
+                              );
+                            } finally {
+                              setState(() => isLoading = false);
+                            }
+                          },
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -216,6 +258,8 @@ class _FoodHomePageState extends State<FoodHomePage> {
       ),
     );
   }
+
+
 
 
 
