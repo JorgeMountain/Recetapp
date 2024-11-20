@@ -54,7 +54,8 @@ class DefaultFirebaseOptions {
     appId: '1:535683951835:android:8ea4347d38f837c125b0fe',
     messagingSenderId: '535683951835',
     projectId: 'recetapp-401ea',
-    storageBucket: 'recetapp-401ea.appspot.com',
+    storageBucket:  'recetapp-401ea.appspot.com',
+
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

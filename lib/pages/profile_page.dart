@@ -1,9 +1,11 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import '../repository/firebase_api.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -13,12 +15,15 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
+  final FirebaseApi _firebaseApi = FirebaseApi(); // Instancia de FirebaseApi
+
   String _backgroundImage = ""; // Imagen predeterminada para fondo
   String _profileImage = ""; // Imagen predeterminada para perfil
   String _userName = "Usuario";
   int _followers = 0, _views = 0, _recipes = 0; // Estadísticas
 
   late TabController _tabController;
+
 
   @override
   void initState() {
@@ -36,18 +41,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   // Cargar datos del usuario desde Firestore
   Future<void> _loadUserData() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
+      final userData = await _firebaseApi.getUserData();
+      if (userData != null) {
         setState(() {
-          _userName = userDoc.data()?["name"] ?? "Usuario";
-          _profileImage = userDoc.data()?["profileImage"] ?? "";
-          _backgroundImage = userDoc.data()?["backgroundImage"] ?? "";
-          _followers = userDoc.data()?["followers"] ?? 0;
-          _views = userDoc.data()?["views"] ?? 0;
-          _recipes = userDoc.data()?["recipes"] ?? 0;
+          _userName = userData["name"] ?? "Usuario";
+          _profileImage = userData["profileImageUrl"] ?? ""; // Actualización aquí
+          _backgroundImage = userData["backgroundImage"] ?? "";
+          _followers = userData["followers"] ?? 0;
+          _views = userData["views"] ?? 0;
+          _recipes = userData["recipes"] ?? 0;
         });
       }
     } catch (e) {
@@ -55,40 +57,41 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     }
   }
 
-  // Cambiar imagen (perfil o fondo)
-  Future<void> _changeImage(String type) async {
+
+  File? imageGobal;
+
+  Future pickImage() async {
     try {
       final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+
       if (image == null) return;
 
-      final file = File(image.path);
+      final imageTemp = File(image.path);
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      setState(() => this.imageGobal = imageTemp);
+      _firebaseApi.updateProfilePicture(imageGobal);
+    } on PlatformException catch (e) {
+      print('Failed to pick image: $e');
+    }
 
-      final fileName = "${DateTime.now().millisecondsSinceEpoch}.jpg";
-      final folder = type == "profile" ? "profile_images" : "background_images";
-      final ref = FirebaseStorage.instance.ref().child("$folder/${user.uid}/$fileName");
+  }
 
-      // Subir archivo a Firebase Storage
-      await ref.putFile(file);
-      final url = await ref.getDownloadURL();
+  Future pickImageC() async {
+    try {
+      final image = await ImagePicker().pickImage(source: ImageSource.camera);
 
-      setState(() {
-        if (type == "profile") {
-          _profileImage = url;
-        } else {
-          _backgroundImage = url;
-        }
-      });
+      if (image == null) return;
 
-      // Actualizar Firestore
-      final field = type == "profile" ? "profileImage" : "backgroundImage";
-      await FirebaseFirestore.instance.collection("users").doc(user.uid).update({field: url});
-    } catch (e) {
-      print("Error al cambiar la imagen: $e");
+      final imageTemp = File(image.path);
+
+      setState(() => this.imageGobal = imageTemp);
+    } on PlatformException catch (e) {
+      print('Failed to pick image: $e');
     }
   }
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +103,9 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           Stack(
             children: [
               GestureDetector(
-                onTap: () => _changeImage("background"),
+                onTap: () {
+                  // Implement background image change logic here, if needed
+                },
                 child: _backgroundImage.isNotEmpty
                     ? Image.network(
                   _backgroundImage,
@@ -121,7 +126,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 right: 10,
                 child: IconButton(
                   onPressed: () {
-                    // Implementa configuración si es necesario
                     print("Configuración presionada");
                   },
                   icon: const Icon(Icons.settings, color: Colors.white),
@@ -130,13 +134,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             ],
           ),
           const SizedBox(height: 10),
-
           // Imagen de perfil
           GestureDetector(
-            onTap: () => _changeImage("profile"),
+            onTap: pickImage,
             child: CircleAvatar(
               radius: 50,
-              backgroundImage: _profileImage.isNotEmpty ? NetworkImage(_profileImage) : null,
+              backgroundImage: imageGobal != null ? FileImage(imageGobal!) : null,
               child: _profileImage.isEmpty
                   ? const Icon(Icons.person, size: 50, color: Colors.white)
                   : null,
@@ -174,7 +177,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             tabs: const [
               Tab(icon: Icon(Icons.grid_on), text: "Recetas"),
               Tab(icon: Icon(Icons.favorite), text: "Favoritos"),
-              Tab(icon: Icon(Icons.star), text: "Guardados"),
             ],
           ),
 
@@ -185,7 +187,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
               children: [
                 _buildTabContent("Aún no hay recetas."),
                 _buildTabContent("Aún no hay favoritos."),
-                _buildTabContent("Aún no hay guardados."),
               ],
             ),
           ),

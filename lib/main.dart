@@ -1,9 +1,11 @@
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:recetapp/pages/login_page.dart';
 import 'package:recetapp/pages/navigation_bar_page.dart';
 import 'package:recetapp/pages/register_page.dart';
 import 'package:recetapp/pages/splash_page.dart';
+import 'package:recetapp/pages/update_profile_page.dart';
 
 import 'firebase_options.dart';
 
@@ -12,6 +14,7 @@ void main()  async{
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
   runApp(const MyApp());
 }
 

@@ -106,22 +106,48 @@ class FirebaseApi {
     }
   }
 
-  Future<File?> pickImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      print("Ruta del archivo seleccionado: ${image.path}");
-      return File(image.path); // Retornar el archivo
-    } else {
-      print("No se seleccionó ninguna imagen.");
-      return null;
-    }
-  }
 
-  Future<void> uploadSelectedImage(String folderName) async {
-    final image = await pickImage();
-    if (image != null) {
-      // Aquí iría la lógica para subir la imagen a Firebase
+  Future<String> updateProfilePicture(File? image) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        throw FirebaseException(
+            plugin: 'FirebaseAuth', code: 'no-user', message: 'User not logged in');
+      }
+        print('aaaaaaaaaa');
+      // Referencia al almacenamiento en Firebase
+      final storage = FirebaseStorage.instanceFor(bucket: 'gs://recetapp-401ea');
+      print('bbbbbbbb');
+
+      final profileImageRef = storage.ref().child('profileImage').child('$uid.jpg');
+      print('cc');
+      print(profileImageRef);
+      // Subir la imagen a Firebase Storage
+      await profileImageRef.putFile(image!);
+      print('dd');
+      // Obtener la URL de descarga de la imagen
+      final profileImageUrl = await profileImageRef.getDownloadURL();
+      print('ee');
+      // Guardar la URL de la foto de perfil en Firestore
+      final db = FirebaseFirestore.instance;
+      print('fff');
+      await db.collection('users').doc(uid).update({
+        'profileImageUrl': profileImageUrl,
+      });
+      print('gg');
+      await profileImageRef.delete().catchError((_) {
+        // Ignorar si no existe una imagen previa
+      });
+
+      return profileImageUrl;
+    } on FirebaseException catch (e) {
+      print("FirebaseException ${e.code}");
+      return e.code;
+    } catch (e) {
+      print("Exception $e");
+      return "unknown-error";
     }
+
   }
 
 }
