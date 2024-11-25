@@ -36,17 +36,29 @@ class SpoonacularApi {
   }
 
   Future<Map<String, dynamic>> fetchRecipeDetails(int recipeId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/$recipeId/information?apiKey=$apiKey'),
-    );
+    try {
+      print('fetchRecipeDetails: Cargando detalles para la receta con ID: $recipeId');
+      final response = await http.get(
+        Uri.parse('$baseUrl/$recipeId/information?apiKey=$apiKey'),
+      );
 
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      print('Error al cargar detalles: ${response.body}');
-      throw Exception('No se pudo obtener información de la receta');
+      if (response.statusCode == 200) {
+        final details = json.decode(response.body);
+        print('fetchRecipeDetails: Detalles cargados correctamente: $details');
+        return details;
+      } else {
+        print('fetchRecipeDetails: Error en la respuesta de la API: ${response.body}');
+        throw Exception('No se pudo obtener información de la receta');
+      }
+    } catch (e) {
+      print('fetchRecipeDetails: Error al cargar detalles: $e');
+      throw Exception('Error al obtener detalles de la receta');
     }
   }
+
+
+
+
 
 
 }

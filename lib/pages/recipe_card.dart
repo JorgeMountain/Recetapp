@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetapp/pages/recipe_detail_screen.dart';
 
+
 Widget buildRecipeCard({
   required BuildContext context,
   required String title,
@@ -10,6 +11,26 @@ Widget buildRecipeCard({
   required Map<String, dynamic> recipe,
   required bool isFavoriteTab,
 }) {
+  if (recipe.isEmpty) {
+    print('buildRecipeCard: Receta vacía');
+    return const Center(
+      child: Text(
+        'Receta inválida.',
+        style: TextStyle(color: Colors.red),
+      ),
+    );
+  }
+
+  if (!recipe.containsKey('id') || recipe['id'] == null) {
+    print('buildRecipeCard: Receta inválida, falta el ID');
+    return const Center(
+      child: Text(
+        'Receta inválida: falta el ID.',
+        style: TextStyle(color: Colors.red),
+      ),
+    );
+  }
+
   final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   return Padding(
@@ -21,27 +42,33 @@ Widget buildRecipeCard({
       ),
       elevation: 5,
       child: InkWell(
-        onTap: () async {
-          try {
-            final recipeDetails = await FirebaseFirestore.instance
-                .collection('recipes')
-                .doc(recipe['id'].toString())
-                .get();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => RecipeDetailScreen(recipe: recipeDetails.data() as Map<String, dynamic>),
-              ),
-            );
-          } catch (e) {
+        onTap: () {
+          print('buildRecipeCard: Datos de la receta: $recipe');
+
+          // Validación del campo 'id' en la receta
+          if (!recipe.containsKey('id') || recipe['id'] == null) {
+            print('Error: La receta no tiene un ID válido');
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Error al cargar la receta.')),
+              const SnackBar(content: Text('Receta inválida: falta el ID.')),
             );
+            return;
           }
+
+          print('buildRecipeCard: Se presionó la receta con ID: ${recipe['id']}');
+
+          // Navegación a los detalles de la receta
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecipeDetailScreen(recipe: recipe),
+            ),
+          );
         },
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Imagen de la receta
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(15.0)),
               child: Image.network(
@@ -80,28 +107,8 @@ Widget buildRecipeCard({
                       isFavoriteTab ? Icons.favorite : Icons.favorite_border,
                       color: Colors.redAccent,
                     ),
-                    onPressed: () async {
-                      if (isFavoriteTab) {
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(userId)
-                            .collection('favorites')
-                            .doc(recipe['id'].toString())
-                            .delete();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receta eliminada de favoritos.')),
-                        );
-                      } else {
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(userId)
-                            .collection('favorites')
-                            .doc(recipe['id'].toString())
-                            .set(recipe);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Receta añadida a favoritos.')),
-                        );
-                      }
+                    onPressed: () {
+                      print('buildRecipeCard: Presionaste favorito para la receta con ID: ${recipe['id']}');
                     },
                   ),
                 ],

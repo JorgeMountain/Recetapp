@@ -212,40 +212,40 @@ class _FoodHomePageState extends State<FoodHomePage> {
                             color: Colors.redAccent,
                           ),
                           onPressed: () async {
-                            setState(() => isLoading = true);
-                            try {
-                              if (isFavoriteTab) {
-                                // Eliminar de favoritos
+                            if (isFavoriteTab) {
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(userId)
+                                  .collection('favorites')
+                                  .doc(recipe['id'].toString())
+                                  .delete();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Receta eliminada de favoritos.')),
+                              );
+                            } else {
+                              try {
+                                final int recipeId = recipe['id'];
+                                final recipeDetails = await SpoonacularApi().fetchRecipeDetails(recipeId);
                                 await FirebaseFirestore.instance
                                     .collection('users')
                                     .doc(userId)
                                     .collection('favorites')
-                                    .doc(recipe['id'].toString())
-                                    .delete();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Receta eliminada de favoritos.')),
-                                );
-                              } else {
-                                // Agregar a favoritos
-                                await FirebaseFirestore.instance
-                                    .collection('users')
-                                    .doc(userId)
-                                    .collection('favorites')
-                                    .doc(recipe['id'].toString())
-                                    .set(recipe);
+                                    .doc(recipeId.toString())
+                                    .set(recipeDetails);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Receta añadida a favoritos.')),
                                 );
+                              } catch (e) {
+                                print('Error al guardar la receta como favorito: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('No se pudo añadir a favoritos.')),
+                                );
                               }
-                            } catch (e) {
-                              print('Error al interactuar con Firebase: $e');
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('No se pudo procesar la solicitud.')),
-                              );
-                            } finally {
-                              setState(() => isLoading = false);
                             }
                           },
+
+
+
                         );
                       },
                     ),
