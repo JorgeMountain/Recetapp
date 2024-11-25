@@ -7,6 +7,9 @@ class RecipeDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Verificar si los datos son de Firestore
+    final isFirestoreRecipe = recipe.containsKey('ingredients') && recipe.containsKey('steps');
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -63,7 +66,19 @@ class RecipeDetailScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      if (recipe['readyInMinutes'] != null)
+                      // Verificar si el tiempo de preparación existe en ambos casos
+                      if (isFirestoreRecipe && recipe['time'] != null)
+                        Row(
+                          children: [
+                            const Icon(Icons.timer, color: Colors.green),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${recipe['time']} min',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        )
+                      else if (!isFirestoreRecipe && recipe['readyInMinutes'] != null)
                         Row(
                           children: [
                             const Icon(Icons.timer, color: Colors.green),
@@ -75,7 +90,19 @@ class RecipeDetailScreen extends StatelessWidget {
                           ],
                         ),
                       const SizedBox(width: 20),
-                      if (recipe['servings'] != null)
+                      // Verificar si las porciones existen en ambos casos
+                      if (isFirestoreRecipe && recipe['portions'] != null)
+                        Row(
+                          children: [
+                            const Icon(Icons.people, color: Colors.blue),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${recipe['portions']} porciones',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        )
+                      else if (!isFirestoreRecipe && recipe['servings'] != null)
                         Row(
                           children: [
                             const Icon(Icons.people, color: Colors.blue),
@@ -89,9 +116,10 @@ class RecipeDetailScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 20),
+                  // Verificar la descripción para ambos casos
                   Text(
-                    recipe['summary']?.replaceAll(RegExp(r'<[^>]*>'), '') ??
-                        'No se encontró resumen.',
+                    recipe['description'] ??
+                        (recipe['summary']?.replaceAll(RegExp(r'<[^>]*>'), '') ?? 'No se encontró descripción.'),
                     style: const TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                 ],
@@ -99,7 +127,34 @@ class RecipeDetailScreen extends StatelessWidget {
             ),
 
             // Ingredientes
-            if (recipe['extendedIngredients'] != null && recipe['extendedIngredients'].isNotEmpty)
+            if (isFirestoreRecipe && recipe['ingredients'].isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Ingredientes',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    ...List.generate(recipe['ingredients'].length, (index) {
+                      final ingredient = recipe['ingredients'][index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5.0),
+                        child: Text(
+                          '- $ingredient',
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              )
+            else if (!isFirestoreRecipe &&
+                recipe['extendedIngredients'] != null &&
+                recipe['extendedIngredients'].isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Column(
@@ -133,8 +188,50 @@ class RecipeDetailScreen extends StatelessWidget {
                 ),
               ),
 
-// Pasos de preparación
-            if (recipe['analyzedInstructions'] != null && recipe['analyzedInstructions'].isNotEmpty)
+            // Pasos de preparación
+            if (isFirestoreRecipe && recipe['steps'].isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Preparación',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    ...List.generate(recipe['steps'].length, (index) {
+                      final step = recipe['steps'][index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 5.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${index + 1}. ',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                step,
+                                style: const TextStyle(fontSize: 16, color: Colors.grey),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              )
+            else if (!isFirestoreRecipe &&
+                recipe['analyzedInstructions'] != null &&
+                recipe['analyzedInstructions'].isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Column(

@@ -1,8 +1,12 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:recetapp/models/recipe.dart';
+import 'package:recetapp/pages/recipe_detail_screen.dart';
+import 'package:recetapp/repository/firebase_api.dart';
 
 class SocialPage extends StatefulWidget {
   const SocialPage({Key? key}) : super(key: key);
@@ -37,56 +41,63 @@ class _SocialPageState extends State<SocialPage> {
         _selectedImage != null &&
         ingredients.isNotEmpty &&
         steps.isNotEmpty) {
-      setState(() {
-        _isUploading = true;
-      });
+      setState(() => _isUploading = true);
+
+      final currentUser = FirebaseAuth.instance.currentUser;
 
       try {
-        // Subir imagen a Firebase Storage
-        final imageRef = FirebaseStorage.instance
-            .ref()
-            .child('posts/${DateTime.now().toIso8601String()}.jpg');
-        await imageRef.putFile(_selectedImage!);
-        final imageUrl = await imageRef.getDownloadURL();
-
-        // Guardar datos en Firestore
-        await FirebaseFirestore.instance.collection('posts').add({
-          'title': _titleController.text,
-          'description': _descriptionController.text,
-          'ingredients': ingredients.where((ingredient) => ingredient.isNotEmpty).toList(),
-          'steps': steps.where((step) => step.isNotEmpty).toList(),
-          'portions': _portionsController.text,
-          'time': _timeController.text,
-          'image': imageUrl,
-          'likes': 0,
-          'isSaved': false,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-
-        // Limpiar campos
-        _titleController.clear();
-        _descriptionController.clear();
-        _portionsController.clear();
-        _timeController.clear();
-        ingredients = [''];
-        steps = [''];
-        _selectedImage = null;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Receta publicada con éxito.')),
+        final newRecipe = Recipe(
+          id: '', // Será generado automáticamente en Firestore
+          title: _titleController.text,
+          description: _descriptionController.text,
+          ingredients: ingredients,
+          steps: steps,
+          portions: _portionsController.text,
+          time: _timeController.text,
+          imageUrl: '', // Será agregado después de subir la imagen
+          userId: currentUser?.uid ?? 'Unknown', // Almacena el userId
         );
+
+        final result = await FirebaseApi().createRecipe(newRecipe, _selectedImage!);
+        if (result.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Receta publicada con éxito')),
+          );
+          Navigator.pop(context);
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al publicar receta: $e')),
         );
       } finally {
-        setState(() {
-          _isUploading = false;
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite(String recipeId, bool isCurrentlyFavorite) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) return; // Verifica si hay usuario autenticado.
+
+    final recipeRef = FirebaseFirestore.instance.collection('recipes').doc(recipeId);
+
+    try {
+      if (isCurrentlyFavorite) {
+        // Eliminar de favoritos
+        await recipeRef.update({
+          'favoriteBy': FieldValue.arrayRemove([currentUser.uid]),
+        });
+      } else {
+        // Agregar a favoritos
+        await recipeRef.update({
+          'favoriteBy': FieldValue.arrayUnion([currentUser.uid]),
         });
       }
-    } else {
+    } catch (e) {
+      print('Error al actualizar favoritos: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor completa todos los campos.')),
+        const SnackBar(content: Text('Error al actualizar favoritos')),
       );
     }
   }
@@ -255,6 +266,10 @@ class _SocialPageState extends State<SocialPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1C1C1C),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF181818),
+        title: const Text('Publicaciones Sociales'),
+      ),
       body: Column(
         children: [
           GestureDetector(
@@ -279,9 +294,132 @@ class _SocialPageState extends State<SocialPage> {
               ),
             ),
           ),
-          // Aquí irían las publicaciones (puedes reutilizar el sistema de tarjetas)
+          const SizedBox(height: 10),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('recipes') // Cambiado de 'posts' a 'recipes'
+                  .orderBy('id') // Puedes ordenar por cualquier campo, como 'timestamp' si lo añades.
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No hay publicaciones aún.',
+                      style: TextStyle(color: Colors.grey, fontSize: 18),
+                    ),
+                  );
+                }
+
+                final recipes = snapshot.data!.docs;
+
+                return ListView.builder(
+                  itemCount: recipes.length,
+                  itemBuilder: (context, index) {
+                    final recipe = recipes[index].data() as Map<String, dynamic>;
+                    return _buildPostCard(recipe, recipes[index].id);
+                  },
+                );
+              },
+            ),
+          ),
+
         ],
       ),
     );
   }
+
+  Widget _buildPostCard(Map<String, dynamic> recipe, String recipeId) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    final isFavorite = recipe['favoriteBy'] != null &&
+        (recipe['favoriteBy'] as List).contains(currentUser?.uid);
+
+    return Card(
+      color: const Color(0xFF1C1C1C),
+      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RecipeDetailScreen(recipe: recipe),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Imagen de la receta
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+              child: Image.network(
+                recipe['image'] ?? 'https://via.placeholder.com/300',
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Título de la receta
+                  Text(
+                    recipe['title'] ?? 'Sin título',
+                    style: const TextStyle(
+                      color: Color(0xFFE6E6FA), // Color lavanda
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+
+                  // Descripción de la receta
+                  Text(
+                    recipe['description'] ?? 'Sin descripción',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Botones de "like" y agregar a favoritos
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.favorite,
+                              color: isFavorite ? Colors.red : Colors.white70,
+                            ),
+                            onPressed: () async {
+                              await _toggleFavorite(recipeId, isFavorite);
+                            },
+                          ),
+                          Text(
+                            '${recipe['favoriteBy']?.length ?? 0}',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
 }

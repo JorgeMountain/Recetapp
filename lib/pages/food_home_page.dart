@@ -76,14 +76,6 @@ class _FoodHomePageState extends State<FoodHomePage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF181818),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: () {
-              // Lógica para buscar recetas
-            },
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10.0),

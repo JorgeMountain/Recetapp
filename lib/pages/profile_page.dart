@@ -70,12 +70,61 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
 
       final imageTemp = File(image.path);
 
-      setState(() => imageGobal = imageTemp);
-      _firebaseApi.updateProfilePicture(imageGobal);
+      setState(() {
+        imageGobal = imageTemp;
+      });
+
+      // Actualizar la imagen en Firebase
+      final updatedUrl = await _firebaseApi.updateProfilePicture(imageGobal);
+      setState(() {
+        _profileImage = updatedUrl; // Actualizar la URL en el estado actual
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto de perfil actualizada')),
+      );
     } on PlatformException catch (e) {
-      print('Failed to pick image: $e');
+      print('Error al seleccionar la imagen: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al seleccionar la imagen')),
+      );
+    } catch (e) {
+      print('Error general: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al actualizar la foto de perfil')),
+      );
     }
   }
+  Future pickBackgroundImage() async {
+    try {
+      final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+
+      if (image == null) return;
+
+      final imageTemp = File(image.path);
+
+      // Actualizar la imagen en Firebase
+      final updatedUrl = await _firebaseApi.updateBackgroundImage(imageTemp);
+      setState(() {
+        _backgroundImage = updatedUrl; // Actualizar la URL en el estado actual
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Imagen de fondo actualizada')),
+      );
+    } on PlatformException catch (e) {
+      print('Error al seleccionar la imagen: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al seleccionar la imagen')),
+      );
+    } catch (e) {
+      print('Error general: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al actualizar la imagen de fondo')),
+      );
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -87,9 +136,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           Stack(
             children: [
               GestureDetector(
-                onTap: () {
-                  // Implement background image change logic here, if needed
-                },
+                onTap: pickBackgroundImage, // Función para seleccionar la imagen
                 child: _backgroundImage.isNotEmpty
                     ? Image.network(
                   _backgroundImage,
@@ -105,6 +152,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   ),
                 ),
               ),
+
               Positioned(
                 top: 10,
                 right: 10,
@@ -127,12 +175,15 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             onTap: pickImage,
             child: CircleAvatar(
               radius: 50,
-              backgroundImage: imageGobal != null ? FileImage(imageGobal!) : null,
-              child: _profileImage.isEmpty
+              backgroundImage: _profileImage.isNotEmpty
+                  ? NetworkImage(_profileImage)
+                  : (imageGobal != null ? FileImage(imageGobal!) : null),
+              child: _profileImage.isEmpty && imageGobal == null
                   ? const Icon(Icons.person, size: 50, color: Colors.white)
                   : null,
             ),
           ),
+
           const SizedBox(height: 10),
 
           // Nombre del usuario (sin botón de configuración)
@@ -174,13 +225,66 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTabContent("Aún no hay recetas."),
+                _buildUserRecipesTab(), // Pestaña de recetas del usuario
                 _buildFavoritesTab(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+
+  // Pestaña de Recetas del Usuario
+  Widget _buildUserRecipesTab() {
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('recipes') // Colección de recetas
+          .where('userId', isEqualTo: userId) // Filtro por usuario actual
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text(
+              'No has publicado recetas aún.',
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+          );
+        }
+
+        final userRecipes = snapshot.data!.docs;
+
+        return ListView.builder(
+          itemCount: userRecipes.length,
+          itemBuilder: (context, index) {
+            final recipe = userRecipes[index].data() as Map<String, dynamic>;
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RecipeDetailScreen(recipe: recipe),
+                  ),
+                );
+              },
+              child: buildRecipeCardusr(
+                context: context,
+                title: recipe['title'] ?? 'Sin título',
+                imageUrl: recipe['image'] ?? 'https://via.placeholder.com/300',
+                recipe: recipe,
+                isFavoriteTab: false,
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -298,6 +402,42 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     );
   }
 
+  Widget buildRecipeCardusr({
+    required BuildContext context,
+    required String title,
+    required String imageUrl,
+    required Map<String, dynamic> recipe,
+    required bool isFavoriteTab,
+  }) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+            child: Image.network(
+              imageUrl,
+              width: double.infinity,
+              height: 150,
+              fit: BoxFit.cover,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 
 
