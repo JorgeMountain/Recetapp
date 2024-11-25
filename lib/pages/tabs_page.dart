@@ -33,7 +33,7 @@ class _TabsPageState extends State<TabsPage> {
               Tab(icon: Icon(Icons.restaurant_menu), text: 'Inicio'), // FoodHomePage
               Tab(icon: Icon(Icons.search), text: 'Buscar'),          // SearchPage
               Tab(icon: Icon(Icons.people), text: 'Social'),          // Nueva pestaña Social
-              Tab(icon: Icon(Icons.list), text: 'Ingredientes'),      // IngredientsListPage
+              Tab(icon: Icon(Icons.list), text: 'Mis Ingredientes'),      // IngredientsListPage
               Tab(icon: Icon(Icons.person), text: 'Perfil'),          // ProfilePage
             ],
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:recetapp/pages/recipe_detail_screen.dart';
+import 'package:recetapp/repository/spoonacular_api.dart';
 
 
 Widget buildRecipeCard({
@@ -42,27 +43,35 @@ Widget buildRecipeCard({
       ),
       elevation: 5,
       child: InkWell(
-        onTap: () {
-          print('buildRecipeCard: Datos de la receta: $recipe');
+        onTap: () async {
+          try {
+            // Verificar si faltan los datos importantes
+            if (!recipe.containsKey('extendedIngredients') || !recipe.containsKey('analyzedInstructions')) {
+              final int recipeId = recipe['id'];
+              print('buildRecipeCard: Faltan datos de la receta, recuperando detalles para ID: $recipeId');
+              final detailedRecipe = await SpoonacularApi().fetchRecipeDetails(recipeId);
 
-          // Validación del campo 'id' en la receta
-          if (!recipe.containsKey('id') || recipe['id'] == null) {
-            print('Error: La receta no tiene un ID válido');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RecipeDetailScreen(recipe: detailedRecipe),
+                ),
+              );
+            } else {
+              // Si ya contiene todos los detalles, navega directamente
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RecipeDetailScreen(recipe: recipe),
+                ),
+              );
+            }
+          } catch (e) {
+            print('Error al cargar detalles de la receta: $e');
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Receta inválida: falta el ID.')),
+              const SnackBar(content: Text('No se pudo cargar los detalles de la receta.')),
             );
-            return;
           }
-
-          print('buildRecipeCard: Se presionó la receta con ID: ${recipe['id']}');
-
-          // Navegación a los detalles de la receta
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => RecipeDetailScreen(recipe: recipe),
-            ),
-          );
         },
 
         child: Column(
@@ -107,8 +116,44 @@ Widget buildRecipeCard({
                       isFavoriteTab ? Icons.favorite : Icons.favorite_border,
                       color: Colors.redAccent,
                     ),
-                    onPressed: () {
-                      print('buildRecipeCard: Presionaste favorito para la receta con ID: ${recipe['id']}');
+                    onPressed: () async {
+                      final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+                      final recipeId = recipe['id'].toString();
+
+                      try {
+                        if (isFavoriteTab) {
+                          // Si estamos en la pestaña de favoritos, eliminamos la receta
+                          print('Eliminando la receta de favoritos con ID: $recipeId');
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(userId)
+                              .collection('favorites')
+                              .doc(recipeId)
+                              .delete();
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Receta eliminada de favoritos.')),
+                          );
+                        } else {
+                          // Si no estamos en la pestaña de favoritos, agregamos la receta
+                          print('Agregando la receta a favoritos con ID: $recipeId');
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(userId)
+                              .collection('favorites')
+                              .doc(recipeId)
+                              .set(recipe);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Receta añadida a favoritos.')),
+                          );
+                        }
+                      } catch (e) {
+                        print('Error al actualizar favoritos: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error al actualizar favoritos: $e')),
+                        );
+                      }
                     },
                   ),
                 ],

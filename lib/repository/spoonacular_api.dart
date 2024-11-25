@@ -56,9 +56,62 @@ class SpoonacularApi {
     }
   }
 
+  Future<List<dynamic>> fetchRecipesByIngredients(String ingredients) async {
+    final url = '$baseUrl/findByIngredients?apiKey=$apiKey&ingredients=$ingredients&number=10';
+    final response = await http.get(Uri.parse(url));
 
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      print('Error en la API: ${response.body}');
+      throw Exception('No se pudieron cargar las recetas con los ingredientes proporcionados.');
+    }
+  }
 
+  Future<List<dynamic>> fetchRecipesBySearch({required String query, required List<String> tags}) async {
+    final tagQuery = tags.join(',');
+    final response = await http.get(Uri.parse('$baseUrl/complexSearch?apiKey=$apiKey&query=$query&tags=$tagQuery&addRecipeInformation=true'));
 
+    if (response.statusCode == 200) {
+      return json.decode(response.body)['results'];
+    } else {
+      throw Exception('Error al buscar recetas');
+    }
+  }
+  Future<List<dynamic>> fetchRecipesByAdvancedSearch({
+    String type = '',
+    String cuisine = '',
+    String diet = '',
+    int? maxReadyTime,
+  }) async {
+    // Construir los parámetros manualmente
+    String url = '$baseUrl/complexSearch?apiKey=$apiKey&addRecipeInformation=true';
 
+    if (type.isNotEmpty) {
+      url += '&type=$type';
+    }
+    if (cuisine.isNotEmpty) {
+      url += '&cuisine=$cuisine';
+    }
+    if (diet.isNotEmpty) {
+      url += '&diet=$diet';
+    }
+    if (maxReadyTime != null) {
+      url += '&maxReadyTime=$maxReadyTime';
+    }
+
+    // Imprimir para depuración
+    print('fetchRecipesByAdvancedSearch: URL generada: $url');
+
+    // Realizar la solicitud
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body)['results'];
+    } else {
+      print('fetchRecipesByAdvancedSearch: Error en la respuesta de la API: ${response.body}');
+      throw Exception('Error al buscar recetas avanzadas');
+    }
+  }
 
 }

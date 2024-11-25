@@ -65,7 +65,7 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.list),            // Ícono de lista de ingredientes
-              label: 'Ingredientes',
+              label: 'Mis Ingredientes',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person),          // Ícono de perfil
